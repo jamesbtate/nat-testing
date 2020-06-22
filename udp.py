@@ -53,7 +53,7 @@ def recv():
         make_socket()
     bytes, address = _socket.recvfrom(1024)
     message = bytes.decode("ascii")
-    print("received", message, "from", address)
+    print("received", "(packet #" + str(received) + ')', message, "from", address)
     return address[0], address[1], message
 
 
@@ -74,8 +74,10 @@ if __name__ == '__main__':
                         recv()
         elif args.server:
             make_socket(port=args.server)
+            received = 1
             while True:
                 host, port, message = recv()
+                received += 1
                 send(host, port, "reply to " + message)
                 send_from_new_socket(host, port, message + " from other port")
     except KeyboardInterrupt:
