@@ -76,6 +76,7 @@ if __name__ == '__main__':
                 if not args.sweep:
                     while True:
                         recv()
+                        received += 1
         elif args.server:
             make_socket(port=args.server)
             while True:
