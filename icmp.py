@@ -32,15 +32,10 @@ def parse_args():
     desc = "UDP client/server script and library for NAT testing"
     parser = argparse.ArgumentParser(description=desc)
     parser.add_argument('-c', '--client', metavar="HOST", nargs='*')
-    parser.add_argument('-p', '--port', metavar="DESTPORT", type=int,
-                        default=7777)
-    parser.add_argument('-s', '--server', metavar="PORT", type=int)
+    parser.add_argument('-s', '--server', action="store_true")
     parser.add_argument('-w', '--sweep', metavar="N", type=int,
-                        help="Sweep N connections to the same destination. \
+                        help="Send N echo requests to the same destination. \
                         Don't wait for a response.")
-    parser.add_argument('-o', '--reply-other', action="store_true",
-                        help="Server will reply to client packet from a \
-                        different port in addition to the normal reply.")
     args = parser.parse_args()
     if not args.client and not args.server:
         parser.error("Must specify client-mode or server-mode")
@@ -140,15 +135,23 @@ def send(host, id, sequence, message):
     _socket.sendto(packet, (host, 0))
     print("sent", '"'+message+'"', "to", host, "id:", id, "sequence:", sequence)
 
+def dict_from_packet(bytes):
+    """ Returns dict of the ICMP header fields from an ICMP packet """
+    names = [ "type", "code", "checksum", "id", "sequence" ]
+    struct_format = "!BBHHH"
+    data = bytes[20:28]
+    unpacked_data = struct.unpack(struct_format, data)
+    return dict(zip(names, unpacked_data))
 
 def recv():
-    """ returns (host, port, message) """
+    """ returns (host, id, sequence) """
     if not _socket:
         make_socket()
-    bytes, address = _socket.recvfrom(1024)
-    message = bytes.decode("ascii")
-    print("received", "(packet #" + str(received) + ')', message, "from", address)
-    return address[0], address[1], message
+    bytes, address = _socket.recvfrom(ICMP_MAX_RECV)
+    header = dict_from_packet(bytes)
+    print("received", "(packet #" + str(received) + ')', "from", address[0],
+          "id:", header['id'], "sequence:", header['sequence'])
+    return address[0], header['id'], header['sequence']
 
 
 if __name__ == '__main__':
@@ -168,13 +171,12 @@ if __name__ == '__main__':
                 if not args.sweep:
                     while True:
                         recv()
+                        received += 1
         elif args.server:
-            make_socket(port=args.server)
+            make_socket()
             while True:
-                host, port, message = recv()
+                host, id, sequence = recv()
                 received += 1
-                send(host, port, "reply to " + message)
-                if args.reply_other:
-                    send_from_new_socket(host, port, message + " from other port")
+                # todo: implement: send(host, port, "reply to " + message)
     except KeyboardInterrupt:
         sys.exit(1)
