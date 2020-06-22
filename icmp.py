@@ -31,11 +31,15 @@ _socket = None
 def parse_args():
     desc = "UDP client/server script and library for NAT testing"
     parser = argparse.ArgumentParser(description=desc)
-    parser.add_argument('-c', '--client', metavar="HOST", nargs='*')
+    parser.add_argument('-c', '--client', metavar="HOST")
     parser.add_argument('-s', '--server', action="store_true")
-    parser.add_argument('-w', '--sweep', metavar="N", type=int,
+    parser.add_argument('-n', '--count', metavar="N", type=int,
                         help="Send N echo requests to the same destination. \
                         Don't wait for a response.")
+    parser.add_argument('-i', '--sweep-id', action="store_true",
+                        help="Sweep ICMP echo ID numbers.")
+    parser.add_argument('-q', '--sweep-sequence', action="store_true",
+                        help="Sweep ICMP echo sequence numbers (typical ping behavior).")
     parser.add_argument('-f', '--filter', metavar="IP",
                        help="Only show ICMP packets from a specific host.")
     args = parser.parse_args()
@@ -129,13 +133,12 @@ def make_echo_packet(id, sequence):
     return packet
 
 
-def send(host, id, sequence, message):
+def send(dest, id, sequence):
     if not _socket:
         make_socket()
-    host = socket.gethostbyname(host)
     packet = make_echo_packet(id, sequence)
-    _socket.sendto(packet, (host, 0))
-    print("sent", '"'+message+'"', "to", host, "id:", id, "sequence:", sequence)
+    _socket.sendto(packet, (dest, 0))
+    print("sent request to", dest, "id:", id, "sequence:", sequence)
 
 def dict_from_packet(bytes):
     """ Returns dict of the ICMP header fields from an ICMP packet """
@@ -165,14 +168,24 @@ if __name__ == '__main__':
         received = 1
         if args.client:
             n = 1
-            if args.sweep:
-                n = args.sweep
+            id = 32767
+            sequence = 0
+            if args.count:
+                n = args.count
+            host = socket.gethostbyname(args.client)
             for i in range(n):
                 make_socket()
-                for host in args.client:
-                    # increment the ID each time to make new sessions
-                    send(host, i, 1234, 'test blah')
-                if not args.sweep:
+                # increment the ID each time to make new sessions
+                send(host, id, sequence)
+                if args.sweep_id:
+                    id += 1
+                    if id >= 65536:
+                        id -= 65536
+                if args.sweep_sequence:
+                    sequence += 1
+                    if sequence >= 65536:
+                        id -= 65536
+                if not args.count:
                     while True:
                         host, id, sequence = recv(args)
                         if host:
@@ -183,6 +196,6 @@ if __name__ == '__main__':
                 host, id, sequence = recv(args)
                 if host:
                     received += 1
-                    # todo: implement: send(host, port, "reply to " + message)
+                    # todo: implement: send(host, id, sequence)
     except KeyboardInterrupt:
         sys.exit(1)
