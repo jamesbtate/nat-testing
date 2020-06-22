@@ -64,6 +64,7 @@ if __name__ == '__main__':
     args = parse_args()
     print(args)
     try:
+        received = 1
         if args.client:
             n = 1
             if args.sweep:
@@ -77,7 +78,6 @@ if __name__ == '__main__':
                         recv()
         elif args.server:
             make_socket(port=args.server)
-            received = 1
             while True:
                 host, port, message = recv()
                 received += 1
