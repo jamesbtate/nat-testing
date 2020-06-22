@@ -15,6 +15,9 @@ def parse_args():
     parser.add_argument('-w', '--sweep', metavar="N", type=int,
                         help="Sweep N connections to the same destination. \
                         Don't wait for a response.")
+    parser.add_argument('-o', '--reply-other', action="store_true",
+                        help="Server will reply to client packet from a \
+                        different port in addition to the normal reply.")
     args = parser.parse_args()
     if not args.client and not args.server:
         parser.error("Must specify client-mode or server-mode")
@@ -79,6 +82,7 @@ if __name__ == '__main__':
                 host, port, message = recv()
                 received += 1
                 send(host, port, "reply to " + message)
-                send_from_new_socket(host, port, message + " from other port")
+                if args.reply_other:
+                    send_from_new_socket(host, port, message + " from other port")
     except KeyboardInterrupt:
         sys.exit(1)
