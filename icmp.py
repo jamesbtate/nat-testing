@@ -36,6 +36,8 @@ def parse_args():
     parser.add_argument('-w', '--sweep', metavar="N", type=int,
                         help="Send N echo requests to the same destination. \
                         Don't wait for a response.")
+    parser.add_argument('-f', '--filter', metavar="IP",
+                       help="Only show ICMP packets from a specific host.")
     args = parser.parse_args()
     if not args.client and not args.server:
         parser.error("Must specify client-mode or server-mode")
@@ -143,15 +145,17 @@ def dict_from_packet(bytes):
     unpacked_data = struct.unpack(struct_format, data)
     return dict(zip(names, unpacked_data))
 
-def recv():
+def recv(args):
     """ returns (host, id, sequence) """
     if not _socket:
         make_socket()
     bytes, address = _socket.recvfrom(ICMP_MAX_RECV)
     header = dict_from_packet(bytes)
-    print("received", "(packet #" + str(received) + ')', "from", address[0],
-          "id:", header['id'], "sequence:", header['sequence'])
-    return address[0], header['id'], header['sequence']
+    if not args.filter or address[0] == args.filter:
+        print("received", "(packet #" + str(received) + ')', "from", address[0],
+              "id:", header['id'], "sequence:", header['sequence'])
+        return address[0], header['id'], header['sequence']
+    return None, None, None
 
 
 if __name__ == '__main__':
@@ -170,13 +174,15 @@ if __name__ == '__main__':
                     send(host, i, 1234, 'test blah')
                 if not args.sweep:
                     while True:
-                        recv()
-                        received += 1
+                        host, id, sequence = recv(args)
+                        if host:
+                            received += 1
         elif args.server:
             make_socket()
             while True:
-                host, id, sequence = recv()
-                received += 1
-                # todo: implement: send(host, port, "reply to " + message)
+                host, id, sequence = recv(args)
+                if host:
+                    received += 1
+                    # todo: implement: send(host, port, "reply to " + message)
     except KeyboardInterrupt:
         sys.exit(1)
